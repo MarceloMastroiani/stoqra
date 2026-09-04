@@ -1,4 +1,8 @@
+
+
+
 import type { Context } from "telegraf";
+import agentService from "../services/agent.service";
 
 class BotController {
 
@@ -10,21 +14,21 @@ class BotController {
 
       if (!message.trim()) return;
 
-      const { from } = ctx.message;
 
-      await ctx.reply(`You said: ${message}`);
+      const userId = ctx.from?.id.toString() ?? "";
+      const chatId = ctx.chat?.id.toString() ?? "";
+      const sessionId = `${userId}-${chatId}`;
 
-      if (from) {
-        await ctx.reply(`Your username: ${from.username}`);
-      }
+      const response = await agentService.getResponse(message, sessionId)
 
+      await ctx.reply(response);
     } catch {
       await ctx.reply(`Something went wrong`);
     }
   }
 
   async start(ctx: Context) {
-    await ctx.reply(`Hello from ${ctx.from?.username ?? "you"}`);
+    await ctx.reply(`Hello my name is Stoqra`);
   }
 }
 
