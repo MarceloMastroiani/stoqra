@@ -29,6 +29,7 @@ function main() {
     });
 
     console.log("Bot is running...");
+
   } catch (err) {
     console.error("Error starting bot:", err);
     process.exit(1);

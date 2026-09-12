@@ -3,8 +3,14 @@
 
 import type { Context } from "telegraf";
 import agentService from "../services/agent.service";
+import { UserService } from "../services/user.service";
+import CryptoService  from "../services/crypto.service";
 
-class BotController {
+export class BotController {
+  constructor(
+    private readonly userService: UserService,
+    private readonly cryptoService = CryptoService
+  ) {}
 
   async message(ctx: Context) {
     try {
@@ -27,9 +33,31 @@ class BotController {
     }
   }
 
+  // TODO: Terminar de implementar
+  async setapikey(ctx: Context) {
+    try {
+
+      // ====== Hardcoded for testing ======
+      const userId = ctx.from?.id.toString() ?? "";
+      const provider = "openai";
+      const model = "1234";
+      const apiKeyEncrypted = this.cryptoService.encrypt("MarceloMastroiani1234");
+      // ===================================
+
+      const result = await this.userService.createUser(userId, provider, model, apiKeyEncrypted)
+
+      if (result !== void 0) {
+        await ctx.reply(`API key set successfully`);
+      } else {
+        await ctx.reply(`API key already set`);
+      }
+    } catch {
+      await ctx.reply(`Something went wrong`);
+    }
+  }
+
   async start(ctx: Context) {
     await ctx.reply(`Hello my name is Stoqra`);
   }
-}
 
-export default new BotController();
+}
