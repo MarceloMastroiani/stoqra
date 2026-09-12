@@ -4,7 +4,7 @@ import { envs } from "../config/envs";
 const ALGORITHM = "aes-256-gcm";
 const KEY = Buffer.from(envs.masterKey, "base64");
 
-class CryptoService {
+export class CryptoService {
   encrypt(plainText: string): string {
     const iv = randomBytes(12);
     const cipher = createCipheriv(ALGORITHM, KEY, iv);

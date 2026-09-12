@@ -19,6 +19,7 @@ bot.catch((err, ctx) => {
 
 function main() {
   try {
+
     void bot.launch();
 
     process.once("SIGINT", () => {
