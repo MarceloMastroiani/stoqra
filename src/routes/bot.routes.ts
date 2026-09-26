@@ -6,6 +6,7 @@ import { message } from "telegraf/filters";
 
 import { BotController } from "../controllers/bot.controller";
 import { UserService } from "../services/user.service";
+import { AgentService } from "../services/agent.service";
 
 import userRepository from "../repository/user.repository";
 import cryptoService from "../services/crypto.service";
@@ -34,6 +35,7 @@ export class BotRouter {
 // Raiz de composición de dependencias
 export const setUpRoutes = (bot: Telegraf) => {
   const userService = new UserService(userRepository);
-  const botController = new BotController(userService, cryptoService);
+  const agentService = new AgentService(userService, cryptoService);
+  const botController = new BotController(userService, cryptoService, agentService);
   new BotRouter(botController, bot);
 };

@@ -1,40 +1,18 @@
-import type { ChatOpenRouterInput } from "@langchain/openrouter";
-import { envs } from "./envs";
+export const PROVIDERS = ["openai", "anthropic", "openrouter", "google", "groq", "deepseek"] as const;
 
-class ModelConfig implements ChatOpenRouterInput {
-  private _model: string;
-  private _temperature: number;
-  private _maxTokens: number;
-  private _apiKey: string;
+export type Provider = (typeof PROVIDERS)[number];
 
-  constructor(model: string, temperature: number, maxTokens: number, apiKey: string) {
-    this._model = model;
-    this._temperature = temperature;
-    this._maxTokens = maxTokens;
-    this._apiKey = apiKey;
-  }
+// ChatOpenRouter permite apuntar a cualquier endpoint compatible con OpenAI
+// pasándole baseURL. Cada proveedor usa su propia URL.
+export const PROVIDER_BASE_URLS: Record<Provider, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1/",
+  openrouter: "https://openrouter.ai/api/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  groq: "https://api.groq.com/openai/v1",
+  deepseek: "https://api.deepseek.com/v1",
+};
 
-  get model() {
-    return this._model;
-  }
-
-  get temperature() {
-    return this._temperature;
-  }
-
-  get maxTokens() {
-    return this._maxTokens;
-  }
-
-  get apiKey() {
-    return this._apiKey;
-  }
-}
-
-
-export const modelConfig = new ModelConfig(
-  "deepseek/deepseek-v4-flash-0731",
-  0,
-  1024,
-  envs.openRouterApiKey,
-);
+export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash-0731";
+export const DEFAULT_TEMPERATURE = 0;
+export const DEFAULT_MAX_TOKENS = 1024;

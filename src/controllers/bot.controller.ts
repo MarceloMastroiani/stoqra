@@ -1,11 +1,9 @@
 import type { Context } from "telegraf";
 
-import agentService from "../services/agent.service";
+import { PROVIDERS, type Provider } from "../config";
+import type { AgentService } from "../services/agent.service";
 import { UserService } from "../services/user.service";
 import { CryptoService } from "../services/crypto.service";
-
-const PROVIDERS = ["openai", "anthropic", "openrouter", "google", "groq", "deepseek"] as const;
-type Provider = (typeof PROVIDERS)[number];
 
 type ApiKeySession =
   | { step: "waiting-provider" }
@@ -17,7 +15,8 @@ export class BotController {
 
   constructor(
     private readonly userService: UserService,
-    private readonly cryptoService: CryptoService
+    private readonly cryptoService: CryptoService,
+    private readonly agentService: AgentService
   ) {}
 
   async message(ctx: Context) {
@@ -48,7 +47,7 @@ export class BotController {
         return;
       }
 
-      const response = await agentService.getResponse(message, sessionId);
+      const response = await this.agentService.getResponse(message, sessionId, userId);
       await ctx.reply(response);
     } catch {
       await ctx.reply("Something went wrong");
@@ -64,7 +63,7 @@ export class BotController {
       const existing = await this.userService.getUser(userId);
       if (existing) {
         await ctx.reply(
-          "Ya tenés una API key configurada. Si querés reemplazarla, enviala ahora o escribí /cancel para cancelar."
+          "Ya tenés una API key configurada. Vamos a reemplazarla. Usá /cancel para cancelar."
         );
       }
 
@@ -92,7 +91,7 @@ export class BotController {
     }
   }
 
-// Maneja la selección del proveedor
+  // Maneja la selección del proveedor
   private async handleProvider(ctx: Context, message: string, sessionId: string) {
     const input = message.trim().toLowerCase() as Provider;
 
@@ -105,7 +104,11 @@ export class BotController {
     }
 
     this.apiKeySessions.set(sessionId, { step: "waiting-model", provider: input });
-    await ctx.reply(`Proveedor: ${input}\n\n¿Qué modelo usás? (ej: gpt-4o, claude-3-opus, deepseek-chat)`);
+
+    const modelExample = input === "openrouter" ? "deepseek/deepseek-chat" : "gpt-4o";
+    await ctx.reply(
+      `Proveedor: ${input}\n\n¿Qué modelo usás? (ej: ${modelExample})`
+    );
   }
 
   private async handleModel(ctx: Context, message: string, sessionId: string) {
@@ -138,6 +141,9 @@ export class BotController {
 
       const apiKeyEncrypted = this.cryptoService.encrypt(apiKey);
       await this.userService.createUser(userId, provider, model, apiKeyEncrypted);
+
+      // Descartamos el agente cacheado para que use la key nueva
+      this.agentService.invalidateUser(userId);
 
       this.apiKeySessions.delete(sessionId);
 
