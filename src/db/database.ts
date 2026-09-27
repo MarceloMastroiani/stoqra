@@ -27,6 +27,10 @@ class DatabaseService {
     `);
   }
 
+  getRawDb(): Database {
+    return this.db;
+  }
+
   getUser(userId: string): UserRecord | null {
     return this.db
       .query<UserRecord, [string]>("SELECT * FROM users WHERE user_id = ?")

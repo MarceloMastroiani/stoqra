@@ -1,6 +1,8 @@
 import { createAgent } from "langchain";
 import { ChatOpenRouter } from "@langchain/openrouter";
-import { MemorySaver } from "@langchain/langgraph";
+//import { MemorySaver } from "@langchain/langgraph";
+import databaseService from "../db/database";
+import { BunSqliteSaver } from "../db/checkpointer";
 
 import {
   DEFAULT_MAX_TOKENS,
@@ -19,14 +21,16 @@ export class AgentService {
   // Caché de agentes por usuario. Las credenciales vienen de la base de datos,
   // por lo que sobreviven reinicios del servidor.
   private readonly agents = new Map<string, Agent>();
+  private readonly checkpointer = new BunSqliteSaver(databaseService.getRawDb());
 
   // Compartido entre todos los agentes para conservar la memoria de cada
   // conversación (thread_id) aunque se reconstruya el agente del usuario.
-  private readonly checkpointer = new MemorySaver();
+  // private readonly checkpointer = new MemorySaver();
 
   constructor(
     private readonly userService: UserService,
     private readonly cryptoService: CryptoService
+
   ) {}
 
   async getResponse(message: string, sessionId: string, userId: string): Promise<string> {
@@ -64,6 +68,7 @@ export class AgentService {
       const lastMessage = result.messages[result.messages.length - 1];
 
       if (lastMessage && "content" in lastMessage) {
+
         return lastMessage.content as string;
       }
 
