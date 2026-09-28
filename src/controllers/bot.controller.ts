@@ -19,6 +19,17 @@ export class BotController {
     private readonly agentService: AgentService
   ) {}
 
+  async handleDocument(ctx: Context) {
+    try {
+      if (!ctx.message || !("document" in ctx.message)) return;
+
+      return ctx.reply(ctx.message.document.file_name ?? "No file name")
+
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
   async message(ctx: Context) {
     try {
       if (!ctx.message || !("text" in ctx.message)) return;

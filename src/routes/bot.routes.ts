@@ -29,6 +29,8 @@ export class BotRouter {
     bot.command("cancel", (ctx) => this.botController.cancel(ctx))
 
     bot.on(message("text"), (ctx) => this.botController.message(ctx))
+
+    bot.on(message("document"), (ctx) => this.botController.handleDocument(ctx))
   }
 }
 
