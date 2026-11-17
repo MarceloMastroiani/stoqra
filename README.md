@@ -1,149 +1,160 @@
-# bot-telegram
+<p align="center">
+  <img src="./assets/stoqra-horizontal.svg" alt="Stoqra" width="420">
+</p>
 
-Un bot de Telegram construido con [grammY](https://grammy.dev/) y [Bun](https://bun.com).
+<p align="center">
+  <strong>Tu asistente de IA en Telegram, con tu propia API key.</strong>
+</p>
 
-> Notas de la migración desde Telegraf, con el detalle de cómo funciona cada pieza: [`MIGRACION-GRAMMY.md`](./MIGRACION-GRAMMY.md).
+<p align="center">
+  <a href="https://bun.com"><img alt="Bun" src="https://img.shields.io/badge/runtime-Bun-black"></a>
+  <a href="https://grammy.dev"><img alt="grammY" src="https://img.shields.io/badge/bot-grammY-blue"></a>
+  <a href="./LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-green"></a>
+</p>
 
-## Descripción
+---
 
-Este proyecto es un bot de Telegram básico que:
-- Responde al comando `/start` con un saludo personalizado
-- Responde a cualquier mensaje de texto repitiendo lo que el usuario escribió
-- Muestra el username del usuario que envió el mensaje
-- Tiene manejo de errores tanto a nivel individual como global
+## ¿Qué es Stoqra?
 
-## Estructura del Proyecto
+Stoqra es un bot de Telegram que te conecta con el modelo de IA de tu preferencia. Cada persona configura **su propio proveedor y su propia API key**, y el bot conserva la memoria de cada conversación, incluso después de reiniciar el servidor.
+
+Con este enfoque no hay costos compartidos: lo que consumas se factura en tu cuenta del proveedor, no en la del que hospeda el bot.
+
+## Características
+
+- **Multi-proveedor:** OpenAI, Anthropic, OpenRouter, Google, Groq y DeepSeek.
+- **Tu propia API key:** se configura desde el chat con `/setapikey` y se guarda cifrada (AES-256-GCM).
+- **Memoria persistente:** el historial de cada conversación se guarda en SQLite y sobrevive a los reinicios.
+- **Configuración guiada:** selección del proveedor con botones y cancelación en cualquier momento con `/cancel`.
+- **Agente extensible:** construido sobre LangChain y LangGraph, listo para sumar herramientas.
+
+## Cómo se usa
+
+1. Abre una conversación **privada** con el bot y envía `/start`.
+2. Envía `/setapikey`, elige tu proveedor y pega tu API key. El bot borra tu mensaje del chat apenas lo recibe.
+3. Escribe cualquier mensaje y el bot responderá usando tu modelo.
+
+### Comandos
+
+| Comando | Descripción |
+|---------|-------------|
+| `/start` | Saluda e indica cómo configurar el bot |
+| `/setapikey` | Inicia la configuración de proveedor y API key (o la reemplaza si ya existe) |
+| `/cancel` | Cancela la configuración en curso |
+
+### Proveedores y modelos por defecto
+
+| Proveedor | Modelo por defecto |
+|-----------|--------------------|
+| `openai` | `gpt-5-mini` |
+| `anthropic` | `claude-sonnet-5-5` |
+| `openrouter` | `deepseek/deepseek-chat` |
+| `google` | `gemini-2.5-flash` |
+| `groq` | `llama-3.3-70b-versatile` |
+| `deepseek` | `deepseek-chat` |
+
+Los modelos por defecto y los parámetros (`temperature: 0`, `maxTokens: 1024`) se definen en [`src/config/index.ts`](./src/config/index.ts).
+
+## Puesta en marcha
+
+### Requisitos
+
+- [Bun](https://bun.com) instalado
+- Un bot de Telegram y su token (créalo con [@BotFather](https://t.me/BotFather) usando `/newbot`)
+
+### Instalación
+
+```bash
+git clone https://github.com/MarceloMastroiani/stoqra.git
+cd stoqra
+bun install
+```
+
+### Variables de entorno
+
+Crea un archivo `.env` en la raíz del proyecto:
+
+```env
+BOT_TOKEN=tu_token_de_botfather
+MASTER_KEY=tu_clave_en_base64
+```
+
+| Variable | Obligatoria | Descripción |
+|----------|:-----------:|-------------|
+| `BOT_TOKEN` | Sí | Token del bot, entregado por @BotFather |
+| `MASTER_KEY` | Sí | Clave de 32 bytes codificada en base64, usada para cifrar las API keys |
+
+Puedes generar una `MASTER_KEY` válida con:
+
+```bash
+openssl rand -base64 32
+```
+
+> **Importante:** guarda la `MASTER_KEY` en un lugar seguro. Si la pierdes o la cambias, las API keys ya guardadas no se podrán descifrar y cada persona tendrá que volver a configurarlas con `/setapikey`.
+
+### Ejecución
+
+```bash
+# Desarrollo (reinicia al detectar cambios)
+bun run dev
+
+# Producción
+bun run src/index.ts
+```
+
+Al iniciar correctamente verás en consola: `Bot @tu_bot is running...`. La base de datos `stoqra.db` se crea automáticamente en el directorio desde el que ejecutes el bot.
+
+## Seguridad y privacidad
+
+- Las API keys se cifran con **AES-256-GCM** (IV aleatorio y etiqueta de autenticación) antes de guardarse; nunca se almacenan en texto plano.
+- El mensaje con la API key se elimina del chat inmediatamente después de recibirlo.
+- Las credenciales y el historial viven en `stoqra.db`, que está excluida del repositorio mediante `.gitignore`. Protege ese archivo y tu `.env`.
+- Ten en cuenta que, como cualquier mensaje de Telegram, la API key pasa por los servidores de Telegram al enviarla. Usa una key dedicada para el bot y revócala desde tu proveedor si sospechas que se expuso.
+- Configura tu API key **solo en chats privados**, nunca en grupos.
+
+## Cómo funciona
+
+```
+Telegram ──► grammY ──► Rutas ──► Controlador ──► AgentService ──► Proveedor de IA
+                │                                     │
+                └── Conversación /setapikey           └── Memoria (checkpointer SQLite)
+```
+
+1. **grammY** recibe los mensajes de Telegram mediante long polling.
+2. Las **rutas** los dirigen al controlador o a la conversación de `/setapikey`.
+3. `AgentService` crea (y cachea) un agente LangChain por persona, con las credenciales descifradas desde la base de datos.
+4. El historial se guarda por conversación (`thread_id` = `usuario-chat`) usando un checkpointer propio sobre `bun:sqlite`.
+
+### Estructura del proyecto
 
 ```
 src/
-├── config/         # Configuración y validación de entorno
-├── controllers/    # Lógica de negocio del bot
-├── routes/         # Mapeo de comandos y eventos a controladores
-├── index.ts        # Punto de entrada principal
+├── index.ts                # Punto de entrada: crea el bot y arranca el polling
+├── bot/
+│   ├── context.ts          # Tipos del contexto de grammY
+│   └── conversations/      # Flujos multi-paso (/setapikey)
+├── config/
+│   ├── envs.ts             # Validación de variables de entorno (Zod)
+│   └── index.ts            # Proveedores, modelos y parámetros por defecto
+├── controllers/            # Respuesta a cada evento del bot
+├── routes/                 # Registro de comandos/eventos y composición de dependencias
+├── services/               # Agente de IA, cifrado y lógica de usuarios
+├── repository/             # Acceso a datos de usuarios
+└── db/                     # SQLite y checkpointer de LangGraph
 ```
 
-## Archivos Principales
+## Roadmap
 
-### `src/index.ts` - Punto de Entrada
+- [ ] Elegir un modelo específico durante `/setapikey` (hoy se usa el modelo por defecto del proveedor)
+- [ ] Comando para reiniciar la memoria de una conversación
+- [ ] Recepción y procesamiento de documentos y planillas
+- [ ] Herramientas (tools) para el agente
+- [ ] Tests y CI
 
-El archivo principal que inicializa el bot. Realiza las siguientes tareas:
+## Documentación adicional
 
-1. **Carga y valida la configuración** - Obtiene el token de las variables de entorno
-2. **Crea la instancia del bot** - Instancia de grammY (`Bot`) con el token verificado
-3. **Registra las rutas** - Configura todos los comandos y manejadores de eventos
-4. **Arranca el bot** - Inicia la escucha de actualizaciones de Telegram
-5. **Maneja señales de terminación** - Soporta Ctrl+C y SIGTERM para apagado ordenado
-6. **Manejo global de errores** - Captura errores no manejados en cualquier handler
+- [Notas de la migración de Telegraf a grammY](./MIGRACION-GRAMMY.md)
 
-### `src/config/envs.ts` - Configuración de Entorno
+## Licencia
 
-Carga y valida las variables de entorno usando [Zod](https://zod.dev/):
-
-- **Requisitos obligatorios**: `BOT_TOKEN` - Token del bot obtenido de @BotFather
-- **Validación**: Usa schema de Zod para asegurar que el token esté presente y sea un string
-- **Configuración de dotenv**: Carga automáticamente el archivo `.env` en `process.env`
-
-Si `BOT_TOKEN` no está definido, la aplicación fallará al iniciar con el mensaje: `BOT_TOKEN is not defined`
-
-### `src/controllers/bot.controller.ts` - Controladores de Lógica
-
-Agrupa todos los manejadores de eventos del bot:
-
-#### `message(ctx)` - Manejador de mensajes de texto
-
-Se dispara para cualquier mensaje de texto entrante:
-
-1. Valida que el mensaje exista y tenga contenido de texto
-2. Obtiene el texto del mensaje (o vacío si es null/undefined)
-3. Verifica que el texto no esté vacío solo con espacios
-4. Responde al usuario repitiendo: `You said: {message}`
-5. Si el usuario tiene username, envía: `Your username: {username}`
-6. Bloque try/catch para manejar errores inesperados - si falla, responde: `Something went wrong`
-
-#### `start(ctx)` - Manejador del comando `/start`
-
-Se ejecuta cuando el usuario escribe `/start`:
-
-1. Envía un saludo personalizado: `Hello from {username}`
-2. Si no hay username disponible, usa "you" como fallback
-3. Usa encadenamiento opcional `?.` para evitar errores si `ctx.from` es undefined
-
-### `src/routes/bot.routes.ts` - Registro de Rutas
-
-Conecta los eventos de Telegram con los controladores:
-
-- **`bot.command("start")`**: Registra el comando `/start` → llama a `botController.start()`
-- **`bot.command("setapikey")`**: Entra a la conversación `setApiKey` para configurar proveedor, modelo y API key
-- **`bot.on("message:text")`**: Registra cualquier mensaje de texto → llama a `botController.message()`
-- **`bot.on("message:document")`**: Registra documentos entrantes → llama a `botController.handleDocument()`
-
-### `src/bot/conversations/set-api-key.conversation.ts` - Flujo de configuración
-
-Conversación de [@grammyjs/conversations](https://grammy.dev/plugins/conversations) que reemplaza el
-manejo manual de estado:
-
-1. Muestra un teclado inline con los proveedores disponibles
-2. Espera el proveedor (callback), el modelo y la API key con `conversation.waitFor*`
-3. Elimina el mensaje con la API key del chat
-4. Guarda las credenciales cifradas y descarta el agente cacheado del usuario
-5. `/cancel` corta el flujo en cualquier paso
-
-> Las operaciones con base de datos, cifrado y servicios externos van dentro de
-> `conversation.external()`, porque la conversación se re-ejecuta desde el inicio en cada update.
-
-## Variables de Entorno
-
-Crear un archivo `.env` en la raíz del proyecto con:
-
-```
-BOT_TOKEN=tu_token_de_telegram_aquí
-```
-
-El token se obtiene hablando con [@BotFather](https://t.me/BotFather) en Telegram y usando el comando `/newbot`.
-
-## Scripts Disponibles
-
-| Script | Descripción |
-|--------|-------------|
-| `bun install` | Instala las dependencias del proyecto |
-| `bun run index.ts` | Inicia el bot de desarrollo |
-| `bun dev` | Alias para `bun run index.ts` (desde package.json) |
-
-## Tecnologías Utilizadas
-
-- **grammY**: Framework para bot de Telegram
-- **@grammyjs/conversations**: Flujos conversacionales multi-paso
-- **Zod**: Validación de schemas de entorno
-- **dotenv**: Carga de variables de entorno desde archivo `.env`
-- **TypeScript**: Tipado estático
-- **Bun**: Runtime de JavaScript
-
-## Patrón de Arquitectura
-
-El código sigue una separación clara de responsabilidades:
-
-1. **Configuración** (`config/envs.ts`): Solo validación de entorno, sin lógica de negocio
-2. **Controladores** (`controllers/bot.controller.ts`): Lógica pura de qué hacer ante cada evento
-3. **Rutas** (`routes/bot.routes.ts`): Mapeo de eventos de Telegram a controladores
-4. **Entrada** (`index.ts`): Orquestación y arranque
-
-Este patrón facilita mantener y escalar el bot en el futuro, permitiendo agregar nuevos comandos y funcionalidades de forma organizada.
-
-## Manejo de Errores
-
-Dos capas de protección:
-
-1. **Intra-handler** (en el controlador): Cada método tiene try/catch individual. Errores -> respuesta "Something went wrong" al usuario.
-2. **Inter-handler** (global en `index.ts`): `bot.catch()` captura errores que escaparon de los try/catch individuales.
-
-## Expansión Futura
-
-Para agregar nuevas funcionalidades:
-
-1. **Nuevo comando**: En `src/routes/bot.routes.ts`, agregar `bot.command("nombre", (ctx) => botController.metodo(ctx))`
-2. **Nueva lógica**: En `src/controllers/bot.controller.ts`, agregar un nuevo método async en la clase `BotController`
-3. **Nuevas variables**: Agregar al schema en `src/config/envs.ts` y usar en los controladores
-
-## Licencian
-
-Este proyecto está bajo la licencia MIT.
+Distribuido bajo la licencia [MIT](./LICENSE).
