@@ -1,7 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import type { Conversation } from "@grammyjs/conversations";
 
-import { PROVIDERS, type Provider } from "../../config";
+import { PROVIDERS, DEFAULT_MODEL,type Provider } from "../../config";
 import type { AgentService } from "../../services/agent.service";
 import type { CryptoService } from "../../services/crypto.service";
 import type { UserService } from "../../services/user.service";
@@ -51,31 +51,35 @@ export function createSetApiKeyConversation(deps: SetApiKeyDeps) {
 
     await ctx.reply("Selecciona tu proveedor de IA", { reply_markup: keyboard });
 
+    // Espera la selección del proveedor a través de un callback query
     const providerCtx = await conversation.waitForCallbackQuery(
-      new RegExp(`^${PROVIDER_CALLBACK_PREFIX}.+$`)
+      new RegExp(`^${PROVIDER_CALLBACK_PREFIX}.+$`) // Expresión regular para validar el callback query
     );
-    await providerCtx.answerCallbackQuery();
+    await providerCtx.answerCallbackQuery(); // Responde el callback query para evitar que el bot quede esperando indefinidamente
 
+    // Obtiene el proveedor seleccionado a partir del callback query
     const provider = providerCtx.callbackQuery.data.slice(PROVIDER_CALLBACK_PREFIX.length);
     if (!isProvider(provider)) {
       await providerCtx.reply("Proveedor no reconocido. Volvé a empezar con /setapikey.");
       return;
     }
 
-    const modelExample = provider === "openrouter" ? "deepseek/deepseek-chat" : "gpt-4o";
+    const modelDefault = provider === "openrouter" ? DEFAULT_MODEL[provider] : DEFAULT_MODEL[provider];
     await providerCtx.editMessageText(
-      `Proveedor: ${provider}\n\n¿Qué modelo usás? (ej: ${modelExample})`
+      `Proveedor: ${provider}\n\nModelo por defecto: ${modelDefault}`
     );
 
-    let modelCtx = await conversation.waitFor("message:text");
-    while (!modelCtx.message.text.trim()) {
-      await modelCtx.reply("El modelo no puede estar vacío. Escribí el nombre del modelo.");
-      modelCtx = await conversation.waitFor("message:text");
-    }
-    const model = modelCtx.message.text.trim();
+    // ===== TODO: FUTURA ACTUALIZACIÓN: Peguntar si se desea ingresar un modelo en específico. =====
+    // let modelCtx = await conversation.waitFor("message:text");
+    // while (!modelCtx.message.text.trim()) {
+    //   await modelCtx.reply("El modelo no puede estar vacío. Escribí el nombre del modelo.");
+    //   modelCtx = await conversation.waitFor("message:text");
+    // }
+    // const modelName = modelCtx.message.text.trim();
 
-    await modelCtx.reply(`Modelo: ${model}\n\nIngresá tu API key de ${provider}:`);
+    // await modelCtx.reply(`Modelo: ${modelName}\n\nIngresá tu API key de ${provider}:`);
 
+    await providerCtx.reply(`Ingresá tu API key de ${provider}:`);
     let keyCtx = await conversation.waitFor("message:text");
     while (!keyCtx.message.text.trim()) {
       await keyCtx.reply(
@@ -92,7 +96,7 @@ export function createSetApiKeyConversation(deps: SetApiKeyDeps) {
       deps.cryptoService.encrypt(apiKey)
     );
     await conversation.external(() =>
-      deps.userService.createUser(userId, provider, model, apiKeyEncrypted)
+      deps.userService.createUser(userId, provider, modelDefault, apiKeyEncrypted)
     );
 
     // Descartamos el agente cacheado para que use la key nueva.
@@ -101,7 +105,7 @@ export function createSetApiKeyConversation(deps: SetApiKeyDeps) {
     });
 
     await keyCtx.reply(
-      `✅ Configuración guardada.\n\nProveedor: ${provider}\nModelo: ${model}\nAPI Key: configurada`
+      `✅ Configuración guardada.\n\nProveedor: ${provider}\nModelo: ${modelDefault}\nAPI Key: configurada`
     );
   };
 }

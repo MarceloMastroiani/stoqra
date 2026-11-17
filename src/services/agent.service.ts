@@ -97,7 +97,7 @@ export class AgentService {
 
   private buildAgent(user: UserRecord): Agent {
     const apiKey = this.cryptoService.decrypt(user.api_key_encrypted);
-    const baseURL = PROVIDER_BASE_URLS[user.provider as Provider];
+    const baseURL = PROVIDER_BASE_URLS[user.provider as Provider ];
 
     const model = new ChatOpenRouter({
       model: user.model ?? DEFAULT_MODEL,

@@ -23,6 +23,7 @@ export const setUpRoutes = (bot: Bot<BotContext>) => {
   // Las conversations se instalan antes de los handlers que las invocan.
   bot.use(conversations());
   bot.use(
+    // Se instala la conversación de configuración de API key
     createConversation(
       createSetApiKeyConversation({ userService, cryptoService, agentService }),
       SET_API_KEY_CONVERSATION
@@ -33,6 +34,7 @@ export const setUpRoutes = (bot: Bot<BotContext>) => {
   bot.command("start", (ctx) => botController.start(ctx));
 
   // "/setapikey"
+  // Inicia la conversación de configuración de API key
   bot.command("setapikey", (ctx) => ctx.conversation.enter(SET_API_KEY_CONVERSATION));
 
   // "/cancel" (mientras hay una conversación activa, lo maneja ella misma)

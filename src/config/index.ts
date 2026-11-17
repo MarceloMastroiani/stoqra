@@ -13,6 +13,13 @@ export const PROVIDER_BASE_URLS: Record<Provider, string> = {
   deepseek: "https://api.deepseek.com/v1",
 };
 
-export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash-0731";
+export const DEFAULT_MODEL: Record<Provider, string> = {
+  openai: "gpt-5-mini",
+  anthropic: "claude-sonnet-5-5",
+  openrouter: "deepseek/deepseek-chat",
+  google: "gemini-2.5-flash",
+  groq: "llama-3.3-70b-versatile",
+  deepseek: "deepseek-chat",
+};
 export const DEFAULT_TEMPERATURE = 0;
 export const DEFAULT_MAX_TOKENS = 1024;
