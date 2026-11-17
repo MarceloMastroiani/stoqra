@@ -1,6 +1,8 @@
 # bot-telegram
 
-Un bot de Telegram construido con [Telegraf](https://telegraf.js.org/) y [Bun](https://bun.com).
+Un bot de Telegram construido con [grammY](https://grammy.dev/) y [Bun](https://bun.com).
+
+> Notas de la migración desde Telegraf, con el detalle de cómo funciona cada pieza: [`MIGRACION-GRAMMY.md`](./MIGRACION-GRAMMY.md).
 
 ## Descripción
 
@@ -27,7 +29,7 @@ src/
 El archivo principal que inicializa el bot. Realiza las siguientes tareas:
 
 1. **Carga y valida la configuración** - Obtiene el token de las variables de entorno
-2. **Crea la instancia del bot** - Instancia de Telegraf con el token verificado
+2. **Crea la instancia del bot** - Instancia de grammY (`Bot`) con el token verificado
 3. **Registra las rutas** - Configura todos los comandos y manejadores de eventos
 4. **Arranca el bot** - Inicia la escucha de actualizaciones de Telegram
 5. **Maneja señales de terminación** - Soporta Ctrl+C y SIGTERM para apagado ordenado
@@ -70,9 +72,24 @@ Se ejecuta cuando el usuario escribe `/start`:
 
 Conecta los eventos de Telegram con los controladores:
 
-- **`bot.start()`**: Registra el comando `/start` → llama a `botController.start()`
-- **`bot.on(message("text"))`**: Registra cualquier mensaje de texto → llama a `botController.message()`
-- Filtra específicamente mensajes de texto simple (no comandos, no fotos, no callbacks)
+- **`bot.command("start")`**: Registra el comando `/start` → llama a `botController.start()`
+- **`bot.command("setapikey")`**: Entra a la conversación `setApiKey` para configurar proveedor, modelo y API key
+- **`bot.on("message:text")`**: Registra cualquier mensaje de texto → llama a `botController.message()`
+- **`bot.on("message:document")`**: Registra documentos entrantes → llama a `botController.handleDocument()`
+
+### `src/bot/conversations/set-api-key.conversation.ts` - Flujo de configuración
+
+Conversación de [@grammyjs/conversations](https://grammy.dev/plugins/conversations) que reemplaza el
+manejo manual de estado:
+
+1. Muestra un teclado inline con los proveedores disponibles
+2. Espera el proveedor (callback), el modelo y la API key con `conversation.waitFor*`
+3. Elimina el mensaje con la API key del chat
+4. Guarda las credenciales cifradas y descarta el agente cacheado del usuario
+5. `/cancel` corta el flujo en cualquier paso
+
+> Las operaciones con base de datos, cifrado y servicios externos van dentro de
+> `conversation.external()`, porque la conversación se re-ejecuta desde el inicio en cada update.
 
 ## Variables de Entorno
 
@@ -94,7 +111,8 @@ El token se obtiene hablando con [@BotFather](https://t.me/BotFather) en Telegra
 
 ## Tecnologías Utilizadas
 
-- **Telegraf**: Framework para bot de Telegram
+- **grammY**: Framework para bot de Telegram
+- **@grammyjs/conversations**: Flujos conversacionales multi-paso
 - **Zod**: Validación de schemas de entorno
 - **dotenv**: Carga de variables de entorno desde archivo `.env`
 - **TypeScript**: Tipado estático
